@@ -38,7 +38,7 @@ where
         self.node
     }
 
-    pub fn down(&self) -> Result<Zipper<'a, T>, &'static str> {
+    pub fn down(&self) -> Result<Zipper<'a, T>, ZipperErr> {
         match self.node.children().first() {
             Some(first) => Ok(Zipper {
                 node: first,
@@ -49,22 +49,22 @@ where
                 })),
                 index_in_parent: Some(0),
             }),
-            None => Err("cannot go down"),
+            None => Err(ZipperErr::CannotGoDown),
         }
     }
 
-    pub fn up(&self) -> Result<Zipper<'a, T>, &'static str> {
+    pub fn up(&self) -> Result<Zipper<'a, T>, ZipperErr> {
         match self.parent {
             Some(ref parent) => Ok(Zipper {
                 node: parent.node,
                 parent: parent.parent.clone(),
                 index_in_parent: parent.index_in_parent,
             }),
-            None => Err("cannot go up"),
+            None => Err(ZipperErr::CannotGoUp),
         }
     }
 
-    pub fn right(&self) -> Result<Zipper<'a, T>, &'static str> {
+    pub fn right(&self) -> Result<Zipper<'a, T>, ZipperErr> {
         match (&self.parent, self.index_in_parent) {
             (Some(parent), Some(index)) if index < parent.node.children().len() - 1 => {
                 let right_index = index + 1;
@@ -78,11 +78,11 @@ where
                     index_in_parent: right_index.into(),
                 })
             }
-            _ => Err("cannot go right"),
+            _ => Err(ZipperErr::CannotGoRight),
         }
     }
 
-    pub fn left(&self) -> Result<Zipper<'a, T>, &'static str> {
+    pub fn left(&self) -> Result<Zipper<'a, T>, ZipperErr> {
         match self.index_in_parent {
             Some(index) if index > 0 => {
                 let left_index = index - 1;
@@ -103,7 +103,7 @@ where
                     index_in_parent: Some(left_index),
                 })
             }
-            _ => Err("cannot go left"),
+            _ => Err(ZipperErr::CannotGoLeft),
         }
     }
 
@@ -114,6 +114,14 @@ where
         println!("{:?}", self);
         self
     }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum ZipperErr {
+    CannotGoUp,
+    CannotGoLeft,
+    CannotGoRight,
+    CannotGoDown,
 }
 
 mod tests {
@@ -136,7 +144,7 @@ mod tests {
     }
 
     #[test]
-    fn down() -> Result<(), &'static str> {
+    fn down() -> Result<(), ZipperErr> {
         let tree = Tree::Branch(vec![Tree::Node(1), Tree::Node(2)]);
 
         let result = tree.zipper().down()?.node();
@@ -146,7 +154,7 @@ mod tests {
     }
 
     #[test]
-    fn down_down() -> Result<(), &'static str> {
+    fn down_down() -> Result<(), ZipperErr> {
         let tree = Tree::Branch(vec![Tree::Branch(vec![Tree::Node(1)]), Tree::Node(2)]);
 
         let result = tree.zipper().down()?.down()?.node();
@@ -156,7 +164,7 @@ mod tests {
     }
 
     #[test]
-    fn down_fail() -> Result<(), &'static str> {
+    fn down_fail() -> Result<(), ZipperErr> {
         let tree = Tree::Branch(vec![]);
 
         let result = tree.zipper().down();
@@ -166,7 +174,7 @@ mod tests {
     }
 
     #[test]
-    fn down_fail2() -> Result<(), &'static str> {
+    fn down_fail2() -> Result<(), ZipperErr> {
         let tree = Tree::Node(0);
 
         let result = tree.zipper().down();
@@ -176,7 +184,7 @@ mod tests {
     }
 
     #[test]
-    fn down_up() -> Result<(), &'static str> {
+    fn down_up() -> Result<(), ZipperErr> {
         let tree = Tree::Branch(vec![Tree::Branch(vec![Tree::Node(1)]), Tree::Node(2)]);
 
         let result = tree.zipper().down()?.up()?.node();
@@ -186,7 +194,7 @@ mod tests {
     }
 
     #[test]
-    fn down_down_up() -> Result<(), &'static str> {
+    fn down_down_up() -> Result<(), ZipperErr> {
         let tree = Tree::Branch(vec![Tree::Branch(vec![Tree::Node(1)]), Tree::Node(2)]);
 
         let result = tree.zipper().down()?.down()?.up()?.node();
@@ -196,7 +204,7 @@ mod tests {
     }
 
     #[test]
-    fn down_down_up_up() -> Result<(), &'static str> {
+    fn down_down_up_up() -> Result<(), ZipperErr> {
         let tree = Tree::Branch(vec![Tree::Branch(vec![Tree::Node(1)]), Tree::Node(2)]);
 
         let result = tree.zipper().down()?.down()?.up()?.up()?.node();
@@ -206,7 +214,7 @@ mod tests {
     }
 
     #[test]
-    fn down_right() -> Result<(), &'static str> {
+    fn down_right() -> Result<(), ZipperErr> {
         let tree = Tree::Branch(vec![Tree::Branch(vec![Tree::Node(1)]), Tree::Node(2)]);
 
         let result = tree.zipper().down()?.right()?.node();
@@ -216,7 +224,7 @@ mod tests {
     }
 
     #[test]
-    fn down_right_up() -> Result<(), &'static str> {
+    fn down_right_up() -> Result<(), ZipperErr> {
         let tree = Tree::Branch(vec![Tree::Branch(vec![Tree::Node(1)]), Tree::Node(2)]);
 
         let result = tree.zipper().down()?.right()?.up()?.node();
@@ -226,7 +234,7 @@ mod tests {
     }
 
     #[test]
-    fn down_right_fail() -> Result<(), &'static str> {
+    fn down_right_fail() -> Result<(), ZipperErr> {
         let tree = Tree::Branch(vec![Tree::Branch(vec![Tree::Node(1)])]);
 
         let result = tree.zipper().down()?.right();
@@ -236,7 +244,7 @@ mod tests {
     }
 
     #[test]
-    fn down_right_left() -> Result<(), &'static str> {
+    fn down_right_left() -> Result<(), ZipperErr> {
         let tree = Tree::Branch(vec![Tree::Branch(vec![Tree::Node(1)]), Tree::Node(2)]);
 
         let result = tree.zipper().down()?.right()?.left()?.node();
@@ -246,7 +254,7 @@ mod tests {
     }
 
     #[test]
-    fn left_fail() -> Result<(), &'static str> {
+    fn left_fail() -> Result<(), ZipperErr> {
         let tree = Tree::Branch(vec![Tree::Branch(vec![Tree::Node(1)]), Tree::Node(2)]);
 
         let result = tree.zipper().left();
@@ -256,7 +264,7 @@ mod tests {
     }
 
     #[test]
-    fn down_left_fail() -> Result<(), &'static str> {
+    fn down_left_fail() -> Result<(), ZipperErr> {
         let tree = Tree::Branch(vec![Tree::Branch(vec![Tree::Node(1)]), Tree::Node(2)]);
 
         let result = tree.zipper().down()?.left();
