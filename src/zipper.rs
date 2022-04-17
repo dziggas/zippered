@@ -3,30 +3,30 @@ use std::rc::Rc;
 
 pub trait Zippable
 where
-    Self: Sized,
+    Self: Clone,
 {
-    fn children(&self) -> &[Self];
+    fn children(&self) -> Box<dyn Iterator<Item = Self> + '_>;
 
     fn zipper(&self) -> Zipper<Self> {
-        Zipper::new(self)
+        Zipper::new(self.clone())
     }
 }
 
 #[derive(Debug, Clone)]
-pub struct Zipper<'a, T>
+pub struct Zipper<T>
 where
     T: Zippable,
 {
-    node: &'a T,
-    parent: Option<Rc<Zipper<'a, T>>>,
+    pub node: T,
+    parent: Option<Rc<Zipper<T>>>,
     index_in_parent: Option<usize>,
 }
 
-impl<'a, T> Zipper<'a, T>
+impl<T> Zipper<T>
 where
-    T: Zippable,
+    T: Zippable + Clone,
 {
-    fn new(root: &'a T) -> Self {
+    fn new(root: T) -> Self {
         Zipper {
             node: root,
             parent: None,
@@ -34,16 +34,12 @@ where
         }
     }
 
-    pub fn node(&self) -> &'a T {
-        self.node
-    }
-
-    pub fn down(&self) -> Result<Zipper<'a, T>, ZipperErr> {
-        match self.node.children().first() {
+    pub fn down(self) -> Result<Zipper<T>, ZipperErr> {
+        match self.node.children().next() {
             Some(first) => Ok(Zipper {
-                node: first,
+                node: first.clone(),
                 parent: Some(Rc::new(Zipper {
-                    node: self.node,
+                    node: self.node.clone(),
                     parent: self.parent.clone(),
                     index_in_parent: self.index_in_parent,
                 })),
@@ -53,10 +49,10 @@ where
         }
     }
 
-    pub fn up(&self) -> Result<Zipper<'a, T>, ZipperErr> {
+    pub fn up(self) -> Result<Zipper<T>, ZipperErr> {
         match self.parent {
             Some(ref parent) => Ok(Zipper {
-                node: parent.node,
+                node: parent.node.clone(),
                 parent: parent.parent.clone(),
                 index_in_parent: parent.index_in_parent,
             }),
@@ -64,54 +60,51 @@ where
         }
     }
 
-    pub fn right(&self) -> Result<Zipper<'a, T>, ZipperErr> {
-        match (&self.parent, self.index_in_parent) {
-            (Some(parent), Some(index)) if index < parent.node.children().len() - 1 => {
+    pub fn right(self) -> Result<Zipper<T>, ZipperErr> {
+        match (
+            self.index_in_parent,
+            self.parent.as_ref().map(|p| p.node.children()),
+        ) {
+            (Some(index), Some(mut children)) => {
                 let right_index = index + 1;
-                let right = 
-                // safe because we already checked index being less than parent children length
-                unsafe { parent.node.children().get_unchecked(index + 1) };
-
-                Ok(Zipper {
-                    node: right,
-                    parent: self.parent.clone(),
-                    index_in_parent: right_index.into(),
-                })
+                match children.nth(right_index) {
+                    Some(right) => Ok(Zipper {
+                        node: right,
+                        parent: self.parent.clone(),
+                        index_in_parent: right_index.into(),
+                    }),
+                    _ => Err(ZipperErr::CannotGoRight),
+                }
             }
             _ => Err(ZipperErr::CannotGoRight),
         }
     }
 
-    pub fn left(&self) -> Result<Zipper<'a, T>, ZipperErr> {
-        match self.index_in_parent {
-            Some(index) if index > 0 => {
+    pub fn left(self) -> Result<Zipper<T>, ZipperErr> {
+        match (
+            self.index_in_parent,
+            self.parent.as_ref().map(|p| p.node.children()),
+        ) {
+            (Some(index), Some(mut children)) if index > 0 => {
                 let left_index = index - 1;
-                let left = 
-                // safe because we already checked index being non-None and bounds being greater than zero
-                unsafe {
-                    self.parent
-                        .as_ref()
-                        .unwrap_unchecked()
-                        .node
-                        .children()
-                        .get_unchecked(left_index)
-                };
-
-                Ok(Zipper {
-                    node: left,
-                    parent: self.parent.clone(),
-                    index_in_parent: Some(left_index),
-                })
+                match children.nth(left_index) {
+                    Some(left) => Ok(Zipper {
+                        node: left,
+                        parent: self.parent.clone(),
+                        index_in_parent: Some(left_index),
+                    }),
+                    None => Err(ZipperErr::CannotGoLeft),
+                }
             }
             _ => Err(ZipperErr::CannotGoLeft),
         }
     }
 
-    pub fn show(&self) -> &Self
+    pub fn show(self) -> Self
     where
         Self: Debug,
     {
-        println!("{:?}", self);
+        println!("{:#?}", &self);
         self
     }
 }
@@ -122,154 +115,4 @@ pub enum ZipperErr {
     CannotGoLeft,
     CannotGoRight,
     CannotGoDown,
-}
-
-mod tests {
-    use super::*;
-
-    #[allow(dead_code)] // to ignore unused warnings of Tree enum
-    #[derive(Debug, PartialEq, Eq)]
-    enum Tree {
-        Node(usize),
-        Branch(Vec<Tree>),
-    }
-
-    impl Zippable for Tree {
-        fn children(&self) -> &[Self] {
-            match self {
-                Tree::Node(_) => &[],
-                Tree::Branch(c) => c.as_slice(),
-            }
-        }
-    }
-
-    #[test]
-    fn down() -> Result<(), ZipperErr> {
-        let tree = Tree::Branch(vec![Tree::Node(1), Tree::Node(2)]);
-
-        let result = tree.zipper().down()?.node();
-
-        assert_eq!(*result, Tree::Node(1));
-        Ok(())
-    }
-
-    #[test]
-    fn down_down() -> Result<(), ZipperErr> {
-        let tree = Tree::Branch(vec![Tree::Branch(vec![Tree::Node(1)]), Tree::Node(2)]);
-
-        let result = tree.zipper().down()?.down()?.node();
-
-        assert_eq!(*result, Tree::Node(1));
-        Ok(())
-    }
-
-    #[test]
-    fn down_fail() -> Result<(), ZipperErr> {
-        let tree = Tree::Branch(vec![]);
-
-        let result = tree.zipper().down();
-
-        assert!(result.is_err());
-        Ok(())
-    }
-
-    #[test]
-    fn down_fail2() -> Result<(), ZipperErr> {
-        let tree = Tree::Node(0);
-
-        let result = tree.zipper().down();
-
-        assert!(result.is_err());
-        Ok(())
-    }
-
-    #[test]
-    fn down_up() -> Result<(), ZipperErr> {
-        let tree = Tree::Branch(vec![Tree::Branch(vec![Tree::Node(1)]), Tree::Node(2)]);
-
-        let result = tree.zipper().down()?.up()?.node();
-
-        assert_eq!(*result, tree);
-        Ok(())
-    }
-
-    #[test]
-    fn down_down_up() -> Result<(), ZipperErr> {
-        let tree = Tree::Branch(vec![Tree::Branch(vec![Tree::Node(1)]), Tree::Node(2)]);
-
-        let result = tree.zipper().down()?.down()?.up()?.node();
-
-        assert_eq!(*result, Tree::Branch(vec![Tree::Node(1)]));
-        Ok(())
-    }
-
-    #[test]
-    fn down_down_up_up() -> Result<(), ZipperErr> {
-        let tree = Tree::Branch(vec![Tree::Branch(vec![Tree::Node(1)]), Tree::Node(2)]);
-
-        let result = tree.zipper().down()?.down()?.up()?.up()?.node();
-
-        assert_eq!(*result, tree);
-        Ok(())
-    }
-
-    #[test]
-    fn down_right() -> Result<(), ZipperErr> {
-        let tree = Tree::Branch(vec![Tree::Branch(vec![Tree::Node(1)]), Tree::Node(2)]);
-
-        let result = tree.zipper().down()?.right()?.node();
-
-        assert_eq!(*result, Tree::Node(2));
-        Ok(())
-    }
-
-    #[test]
-    fn down_right_up() -> Result<(), ZipperErr> {
-        let tree = Tree::Branch(vec![Tree::Branch(vec![Tree::Node(1)]), Tree::Node(2)]);
-
-        let result = tree.zipper().down()?.right()?.up()?.node();
-
-        assert_eq!(*result, tree);
-        Ok(())
-    }
-
-    #[test]
-    fn down_right_fail() -> Result<(), ZipperErr> {
-        let tree = Tree::Branch(vec![Tree::Branch(vec![Tree::Node(1)])]);
-
-        let result = tree.zipper().down()?.right();
-
-        assert!(result.is_err());
-        Ok(())
-    }
-
-    #[test]
-    fn down_right_left() -> Result<(), ZipperErr> {
-        let tree = Tree::Branch(vec![Tree::Branch(vec![Tree::Node(1)]), Tree::Node(2)]);
-
-        let result = tree.zipper().down()?.right()?.left()?.node();
-
-        assert_eq!(*result, Tree::Branch(vec![Tree::Node(1)]));
-        Ok(())
-    }
-
-    #[test]
-    fn left_fail() -> Result<(), ZipperErr> {
-        let tree = Tree::Branch(vec![Tree::Branch(vec![Tree::Node(1)]), Tree::Node(2)]);
-
-        let result = tree.zipper().left();
-
-        assert!(result.is_err());
-        Ok(())
-    }
-
-    #[test]
-    fn down_left_fail() -> Result<(), ZipperErr> {
-        let tree = Tree::Branch(vec![Tree::Branch(vec![Tree::Node(1)]), Tree::Node(2)]);
-
-        let result = tree.zipper().down()?.left();
-
-        assert!(result.is_err());
-        Ok(())
-    }
 }
