@@ -1,6 +1,5 @@
 use zippered::zipper::{Zippable, ZipperErr};
 
-#[allow(dead_code)] // to ignore unused warnings of Tree enum
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Tree {
     Node(usize),
@@ -11,7 +10,7 @@ impl Zippable for Tree {
     fn children(&self) -> Box<dyn Iterator<Item = Self> + '_> {
         match self {
             Tree::Node(_) => Box::new(std::iter::empty()),
-            Tree::Branch(c) => Box::new(c.iter().cloned()),
+            Tree::Branch(branch) => Box::new(branch.iter().cloned()),
         }
     }
 }
