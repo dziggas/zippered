@@ -38,12 +38,13 @@ impl Zippable for Tree {
 
 See the [tree tests](tests/tree.rs) for more details.
 
-## Limitations
+## Features & Limitations
 
-This implementation was born out of a specific read-only use case, and thus:
+This implementation was born out of a specific, read-only use case, and thus:
 
 * There are no edit functions on the `Zipper`
-* Currently, Zippable requires that `Self: Clone` because it was originally used with Rc/Arc
-* `Zipper` does not memoize children traversal, which, if exploring in a tight radius of a node could cause re-iterations
-
-It should be possible to remove any/all of these
+* There is bookkeeping within Zipper to memoize historic traversal. Zippable only requires that nodes provide an Iterator over that node's children. This allows a variety of lazy, flexible `Zippable::children` implementations, but precludes Zipper from internally using something like `parent.children[current_position - 1]` to efficiently move left. Memoization solves this issue at the cost of some space
+  * The bookkeeping allows for implementing `back`, which is atypical for Zippers
+  * It also allows for storage and retreival of `Path` and `Journey` types where `Path` is a direct navigation path to a node in the `Zipper` and where `Journey` is the entire traversal/movement history
+* Currently, Zippable requires `Self: Clone` because it was originally used with Rc/Arc
+  * It is highly recommended that Zippable impl targets are trivially `Clone` or wrapped in Rc/Arc

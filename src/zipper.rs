@@ -16,7 +16,7 @@ where
 }
 
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
-enum Step {
+pub enum Step {
     Up,
     Down,
     Left,
@@ -24,29 +24,36 @@ enum Step {
     Back,
 }
 
+type Path = Vector<Step>;
+
 #[derive(Debug, Clone)]
 pub struct History {
-    path: Vector<Step>,
-    journey: Vector<Step>,
+    path: Path,
+    journey: Path,
 }
-
-type Path = Vector<Step>;
 
 impl History {
     fn new() -> Self {
         Self {
             path: Path::new(),
-            journey: Vector::new(),
+            journey: Path::new(),
         }
     }
 
-    // TODO: this is definitely brittle, and should have a whole suite of tests
     fn step(self, direction: Step) -> History {
         let mut next = self.clone();
 
         match direction {
             // A step in any of these directions effectively erases the end of the path as it is a backwards step
-            Step::Back | Step::Up | Step::Left => {
+            Step::Back | Step::Left => {
+                next.path.pop_back();
+            }
+            // we need to erase any previous Right steps
+            Step::Up => {
+                while next.path.last() == Some(&Step::Right) {
+                    next.path.pop_back();
+                }
+                // finally, pop the Down step
                 next.path.pop_back();
             }
             _ => {
@@ -79,7 +86,7 @@ where
     }
 
     fn find(&self, path: &Path) -> Option<Zipper<T>> {
-        self.storage.borrow().get(path).cloned()
+        (*self.storage).borrow().get(path).cloned()
     }
 
     fn insert(&self, path: &Path, zipper: Zipper<T>) {
@@ -95,8 +102,7 @@ where
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("SingletonNodeCache")
-            .field("entries", &self.storage.borrow().len())
-            // .field("storage_keys", &self.storage.borrow().keys())
+            .field("entries", &(*self.storage).borrow().len())
             .finish()
     }
 }
@@ -107,7 +113,7 @@ where
     T: Zippable,
 {
     pub node: T,
-    pub history: History,
+    history: History,
     parent: Option<Rc<Zipper<T>>>,
     index_in_parent: Option<usize>,
     cache: SingletonNodeCache<T>,
@@ -132,7 +138,10 @@ where
         let next_history = self.history.clone().step(Step::Down);
         // check cache and return if possible
         match self.cache.find(&next_history.path) {
-            Some(cached) => return Ok(cached),
+            Some(mut cached) => {
+                cached.history = next_history;
+                return Ok(cached);
+            }
             _ => (),
         }
 
@@ -182,7 +191,10 @@ where
         let next_history = self.history.clone().step(Step::Right);
         // check cache and return if possible
         match self.cache.find(&next_history.path) {
-            Some(cached) => return Ok(cached),
+            Some(mut cached) => {
+                cached.history = next_history;
+                return Ok(cached);
+            }
             _ => (),
         }
 
@@ -200,7 +212,7 @@ where
                             node: right,
                             parent: self.parent.clone(),
                             index_in_parent: right_index.into(),
-                            history: self.history.step(Step::Right),
+                            history: next_history,
                             cache: self.cache.clone(),
                         };
 
@@ -221,9 +233,14 @@ where
         let next_history = self.history.clone().step(Step::Left);
         // check cache and return if possible
         match self.cache.find(&next_history.path) {
-            Some(cached) => return Ok(cached),
+            Some(mut cached) => {
+                cached.history = next_history;
+                return Ok(cached);
+            }
             _ => (),
         }
+
+        dbg!("We should really never be here if caching is working.");
 
         // see if we can move
         match (
@@ -239,7 +256,7 @@ where
                             node: left,
                             parent: self.parent.clone(),
                             index_in_parent: Some(left_index),
-                            history: self.history.step(Step::Left),
+                            history: next_history,
                             cache: self.cache.clone(),
                         };
 
@@ -261,16 +278,50 @@ where
 
         // check cache and return if possible
         match self.cache.find(&next_history.path) {
-            Some(cached) => return Ok(cached),
+            Some(mut cached) => {
+                cached.history = next_history;
+                return Ok(cached);
+            }
             _ => (),
         }
 
         // there is no traversal path, we are at the top, use parent if it exists
-        if next_history.path.len() == 0 && self.parent.is_some() {
-            return Ok((*self.parent.unwrap()).clone());
-        } else {
-            Err(ZipperErr::CannotGoBack)
+        match self.parent {
+            Some(parent) if next_history.path.len() == 0 => {
+                let mut next = parent.as_ref().clone();
+                next.history = next_history;
+                Ok(next)
+            }
+            _ => Err(ZipperErr::CannotGoBack),
         }
+    }
+
+    pub fn step(self, step: &Step) -> Result<Zipper<T>, ZipperErr> {
+        match step {
+            Step::Up => self.up(),
+            Step::Down => self.down(),
+            Step::Left => self.left(),
+            Step::Right => self.right(),
+            Step::Back => self.back(),
+        }
+    }
+
+    pub fn travel(self, path: impl Iterator<Item = Step>) -> Result<Zipper<T>, ZipperErr> {
+        let mut zipper = self;
+
+        for step in path {
+            zipper = zipper.step(&step)?;
+        }
+
+        Ok(zipper)
+    }
+
+    pub fn path(&self) -> impl Iterator<Item = Step> + '_ {
+        self.history.path.iter().cloned()
+    }
+
+    pub fn journey(&self) -> impl Iterator<Item = Step> + '_ {
+        self.history.journey.iter().cloned()
     }
 
     pub fn show(self) -> Self

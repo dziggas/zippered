@@ -1,4 +1,5 @@
-use zippered::zipper::{Zippable, ZipperErr};
+use zippered::zipper::{Step, Zippable, ZipperErr};
+use Step::*;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Tree {
@@ -19,9 +20,15 @@ impl Zippable for Tree {
 fn down() -> Result<(), ZipperErr> {
     let tree = Tree::Branch(vec![Tree::Node(1), Tree::Node(2)]);
 
-    let result = tree.zipper().down()?.node;
+    let zipped = tree.zipper().down()?;
+    let result = zipped.node.clone();
 
     assert_eq!(result, Tree::Node(1));
+    assert_eq!(zipped.path().collect::<Vec<Step>>(), vec![Down]);
+    assert_eq!(zipped.journey().collect::<Vec<Step>>(), vec![Down]);
+    assert_eq!(result, tree.zipper().travel(zipped.path())?.node);
+    assert_eq!(result, tree.zipper().travel(zipped.journey())?.node);
+
     Ok(())
 }
 
@@ -29,9 +36,15 @@ fn down() -> Result<(), ZipperErr> {
 fn down_down() -> Result<(), ZipperErr> {
     let tree = Tree::Branch(vec![Tree::Branch(vec![Tree::Node(1)]), Tree::Node(2)]);
 
-    let result = tree.zipper().down()?.down()?.node;
+    let zipped = tree.zipper().down()?.down()?;
+    let result = zipped.node.clone();
 
     assert_eq!(result, Tree::Node(1));
+    assert_eq!(zipped.path().collect::<Vec<Step>>(), vec![Down, Down]);
+    assert_eq!(zipped.journey().collect::<Vec<Step>>(), vec![Down, Down]);
+    assert_eq!(result, tree.zipper().travel(zipped.path())?.node);
+    assert_eq!(result, tree.zipper().travel(zipped.journey())?.node);
+
     Ok(())
 }
 
@@ -59,9 +72,15 @@ fn down_fail2() -> Result<(), ZipperErr> {
 fn down_up() -> Result<(), ZipperErr> {
     let tree = Tree::Branch(vec![Tree::Branch(vec![Tree::Node(1)]), Tree::Node(2)]);
 
-    let result = tree.zipper().down()?.up()?.node;
+    let zipped = tree.zipper().down()?.up()?;
+    let result = zipped.node.clone();
 
     assert_eq!(result, tree);
+    assert_eq!(zipped.path().collect::<Vec<Step>>(), vec![]);
+    assert_eq!(zipped.journey().collect::<Vec<Step>>(), vec![Down, Up]);
+    assert_eq!(result, tree.zipper().travel(zipped.path())?.node);
+    assert_eq!(result, tree.zipper().travel(zipped.journey())?.node);
+
     Ok(())
 }
 
@@ -69,9 +88,15 @@ fn down_up() -> Result<(), ZipperErr> {
 fn down_back() -> Result<(), ZipperErr> {
     let tree = Tree::Branch(vec![Tree::Branch(vec![Tree::Node(1)]), Tree::Node(2)]);
 
-    let result = tree.zipper().down()?.back()?.node;
+    let zipped = tree.zipper().down()?.back()?;
+    let result = zipped.node.clone();
 
     assert_eq!(result, tree);
+    assert_eq!(zipped.path().collect::<Vec<Step>>(), vec![]);
+    assert_eq!(zipped.journey().collect::<Vec<Step>>(), vec![Down, Back]);
+    assert_eq!(result, tree.zipper().travel(zipped.path())?.node);
+    assert_eq!(result, tree.zipper().travel(zipped.journey())?.node);
+
     Ok(())
 }
 
@@ -79,9 +104,18 @@ fn down_back() -> Result<(), ZipperErr> {
 fn down_down_up() -> Result<(), ZipperErr> {
     let tree = Tree::Branch(vec![Tree::Branch(vec![Tree::Node(1)]), Tree::Node(2)]);
 
-    let result = tree.zipper().down()?.down()?.up()?.node;
+    let zipped = tree.zipper().down()?.down()?.up()?;
+    let result = zipped.node.clone();
 
     assert_eq!(result, Tree::Branch(vec![Tree::Node(1)]));
+    assert_eq!(zipped.path().collect::<Vec<Step>>(), vec![Down]);
+    assert_eq!(
+        zipped.journey().collect::<Vec<Step>>(),
+        vec![Down, Down, Up]
+    );
+    assert_eq!(result, tree.zipper().travel(zipped.path())?.node);
+    assert_eq!(result, tree.zipper().travel(zipped.journey())?.node);
+
     Ok(())
 }
 
@@ -89,9 +123,18 @@ fn down_down_up() -> Result<(), ZipperErr> {
 fn down_down_back() -> Result<(), ZipperErr> {
     let tree = Tree::Branch(vec![Tree::Branch(vec![Tree::Node(1)]), Tree::Node(2)]);
 
-    let result = tree.zipper().down()?.down()?.back()?.node;
+    let zipped = tree.zipper().down()?.down()?.back()?;
+    let result = zipped.node.clone();
 
     assert_eq!(result, Tree::Branch(vec![Tree::Node(1)]));
+    assert_eq!(zipped.path().collect::<Vec<Step>>(), vec![Down]);
+    assert_eq!(
+        zipped.journey().collect::<Vec<Step>>(),
+        vec![Down, Down, Back]
+    );
+    assert_eq!(result, tree.zipper().travel(zipped.path())?.node);
+    assert_eq!(result, tree.zipper().travel(zipped.journey())?.node);
+
     Ok(())
 }
 
@@ -99,9 +142,18 @@ fn down_down_back() -> Result<(), ZipperErr> {
 fn down_down_up_up() -> Result<(), ZipperErr> {
     let tree = Tree::Branch(vec![Tree::Branch(vec![Tree::Node(1)]), Tree::Node(2)]);
 
-    let result = tree.zipper().down()?.down()?.up()?.up()?.node;
+    let zipped = tree.zipper().down()?.down()?.up()?.up()?;
+    let result = zipped.node.clone();
 
     assert_eq!(result, tree);
+    assert_eq!(zipped.path().collect::<Vec<Step>>(), vec![]);
+    assert_eq!(
+        zipped.journey().collect::<Vec<Step>>(),
+        vec![Down, Down, Up, Up]
+    );
+    assert_eq!(result, tree.zipper().travel(zipped.path())?.node);
+    assert_eq!(result, tree.zipper().travel(zipped.journey())?.node);
+
     Ok(())
 }
 
@@ -109,9 +161,15 @@ fn down_down_up_up() -> Result<(), ZipperErr> {
 fn down_right() -> Result<(), ZipperErr> {
     let tree = Tree::Branch(vec![Tree::Branch(vec![Tree::Node(1)]), Tree::Node(2)]);
 
-    let result = tree.zipper().down()?.right()?.node;
+    let zipped = tree.zipper().down()?.right()?;
+    let result = zipped.node.clone();
 
     assert_eq!(result, Tree::Node(2));
+    assert_eq!(zipped.path().collect::<Vec<Step>>(), vec![Down, Right]);
+    assert_eq!(zipped.journey().collect::<Vec<Step>>(), vec![Down, Right]);
+    assert_eq!(result, tree.zipper().travel(zipped.path())?.node);
+    assert_eq!(result, tree.zipper().travel(zipped.journey())?.node);
+
     Ok(())
 }
 
@@ -119,9 +177,18 @@ fn down_right() -> Result<(), ZipperErr> {
 fn down_right_up() -> Result<(), ZipperErr> {
     let tree = Tree::Branch(vec![Tree::Branch(vec![Tree::Node(1)]), Tree::Node(2)]);
 
-    let result = tree.zipper().down()?.right()?.up()?.node;
+    let zipped = tree.zipper().down()?.right()?.up()?;
+    let result = zipped.node.clone();
 
     assert_eq!(result, tree);
+    assert_eq!(zipped.path().collect::<Vec<Step>>(), vec![]);
+    assert_eq!(
+        zipped.journey().collect::<Vec<Step>>(),
+        vec![Down, Right, Up]
+    );
+    assert_eq!(result, tree.zipper().travel(zipped.path())?.node);
+    assert_eq!(result, tree.zipper().travel(zipped.journey())?.node);
+
     Ok(())
 }
 
@@ -139,9 +206,18 @@ fn down_right_fail() -> Result<(), ZipperErr> {
 fn down_right_left() -> Result<(), ZipperErr> {
     let tree = Tree::Branch(vec![Tree::Branch(vec![Tree::Node(1)]), Tree::Node(2)]);
 
-    let result = tree.zipper().down()?.right()?.left()?.node;
+    let zipped = tree.zipper().down()?.right()?.left()?;
+    let result = zipped.node.clone();
 
     assert_eq!(result, Tree::Branch(vec![Tree::Node(1)]));
+    assert_eq!(zipped.path().collect::<Vec<Step>>(), vec![Down]);
+    assert_eq!(
+        zipped.journey().collect::<Vec<Step>>(),
+        vec![Down, Right, Left]
+    );
+    assert_eq!(result, tree.zipper().travel(zipped.path())?.node);
+    assert_eq!(result, tree.zipper().travel(zipped.journey())?.node);
+
     Ok(())
 }
 
@@ -149,9 +225,18 @@ fn down_right_left() -> Result<(), ZipperErr> {
 fn down_right_back() -> Result<(), ZipperErr> {
     let tree = Tree::Branch(vec![Tree::Branch(vec![Tree::Node(1)]), Tree::Node(2)]);
 
-    let result = tree.zipper().down()?.right()?.back()?.node;
+    let zipped = tree.zipper().down()?.right()?.back()?;
+    let result = zipped.node.clone();
 
     assert_eq!(result, Tree::Branch(vec![Tree::Node(1)]));
+    assert_eq!(zipped.path().collect::<Vec<Step>>(), vec![Down]);
+    assert_eq!(
+        zipped.journey().collect::<Vec<Step>>(),
+        vec![Down, Right, Back]
+    );
+    assert_eq!(result, tree.zipper().travel(zipped.path())?.node);
+    assert_eq!(result, tree.zipper().travel(zipped.journey())?.node);
+
     Ok(())
 }
 
@@ -199,16 +284,17 @@ fn down_left_fail() -> Result<(), ZipperErr> {
 fn down_down_up_up_down_down() -> Result<(), ZipperErr> {
     let tree = Tree::Branch(vec![Tree::Branch(vec![Tree::Node(1)]), Tree::Node(2)]);
 
-    let result = tree
-        .zipper()
-        .down()?
-        .down()?
-        .up()?
-        .up()?
-        .down()?
-        .down()?
-        .node;
+    let zipped = tree.zipper().down()?.down()?.up()?.up()?.down()?.down()?;
+    let result = zipped.node.clone();
 
     assert_eq!(result, Tree::Node(1));
+    assert_eq!(zipped.path().collect::<Vec<Step>>(), vec![Down, Down]);
+    assert_eq!(
+        zipped.journey().collect::<Vec<Step>>(),
+        vec![Down, Down, Up, Up, Down, Down]
+    );
+    assert_eq!(result, tree.zipper().travel(zipped.path())?.node);
+    assert_eq!(result, tree.zipper().travel(zipped.journey())?.node);
+
     Ok(())
 }
