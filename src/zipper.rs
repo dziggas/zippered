@@ -1,6 +1,8 @@
-use im::Vector;
-use std::fmt::Debug;
+use std::collections::HashMap;
 use std::rc::Rc;
+use std::{cell::RefCell, fmt::Debug};
+
+use im::Vector;
 
 pub trait Zippable
 where
@@ -38,11 +40,13 @@ impl History {
         }
     }
 
+    // TODO: this is definitely brittle, and should have a whole suite of tests
     fn step(self, direction: Step) -> History {
         let mut next = self.clone();
 
         match direction {
-            Step::Back => {
+            // A step in any of these directions effectively erases the end of the path as it is a backwards step
+            Step::Back | Step::Up | Step::Left => {
                 next.path.pop_back();
             }
             _ => {
@@ -56,7 +60,48 @@ impl History {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
+struct SingletonNodeCache<T>
+where
+    T: Zippable,
+{
+    storage: Rc<RefCell<HashMap<Path, Zipper<T>>>>,
+}
+
+impl<T> SingletonNodeCache<T>
+where
+    T: Zippable,
+{
+    fn new() -> Self {
+        Self {
+            storage: Rc::new(RefCell::new(HashMap::new())),
+        }
+    }
+
+    fn find(&self, path: &Path) -> Option<Zipper<T>> {
+        self.storage.borrow().get(path).cloned()
+    }
+
+    fn insert(&self, path: &Path, zipper: Zipper<T>) {
+        self.storage
+            .borrow_mut()
+            .insert(path.clone(), zipper.clone());
+    }
+}
+
+impl<T> std::fmt::Debug for SingletonNodeCache<T>
+where
+    T: Zippable,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SingletonNodeCache")
+            .field("entries", &self.storage.borrow().len())
+            // .field("storage_keys", &self.storage.borrow().keys())
+            .finish()
+    }
+}
+
+#[derive(Clone)]
 pub struct Zipper<T>
 where
     T: Zippable,
@@ -65,6 +110,7 @@ where
     pub history: History,
     parent: Option<Rc<Zipper<T>>>,
     index_in_parent: Option<usize>,
+    cache: SingletonNodeCache<T>,
 }
 
 impl<T> Zipper<T>
@@ -77,23 +123,39 @@ where
             parent: None,
             index_in_parent: None,
             history: History::new(),
+            cache: SingletonNodeCache::new(),
         }
     }
 
     pub fn down(self) -> Result<Zipper<T>, ZipperErr> {
+        // this is where we want to go
+        let next_history = self.history.clone().step(Step::Down);
+        // check cache and return if possible
+        match self.cache.find(&next_history.path) {
+            _ => (),
+        }
+
+        // see if we can move
         match self.node.children().next() {
+            // we can
             Some(first) => {
+                // see if we've been to this path before
                 let next = Zipper {
                     node: first.clone(),
                     parent: Some(Rc::new(Zipper {
                         node: self.node.clone(),
                         parent: self.parent.clone(),
                         index_in_parent: self.index_in_parent,
-                        history: self.history.clone(),
+                        history: self.history,
+                        cache: self.cache.clone(),
                     })),
                     index_in_parent: Some(0),
-                    history: self.history.step(Step::Down),
+                    history: next_history,
+                    cache: self.cache.clone(),
                 };
+
+                // add to cache
+                self.cache.insert(&next.history.path, next.clone());
 
                 Ok(next)
             }
@@ -108,16 +170,26 @@ where
                 parent: parent.parent.clone(),
                 index_in_parent: parent.index_in_parent,
                 history: self.history.step(Step::Up),
+                cache: self.cache,
             }),
             None => Err(ZipperErr::CannotGoUp),
         }
     }
 
     pub fn right(self) -> Result<Zipper<T>, ZipperErr> {
+        // this is where we want to go
+        let next_history = self.history.clone().step(Step::Right);
+        // check cache and return if possible
+        match self.cache.find(&next_history.path) {
+            _ => (),
+        }
+
+        // see if we can move
         match (
             self.index_in_parent,
             self.parent.as_ref().map(|p| p.node.children()),
         ) {
+            // we can
             (Some(index), Some(mut children)) => {
                 let right_index = index + 1;
                 match children.nth(right_index) {
@@ -127,7 +199,11 @@ where
                             parent: self.parent.clone(),
                             index_in_parent: right_index.into(),
                             history: self.history.step(Step::Right),
+                            cache: self.cache.clone(),
                         };
+
+                        // add to cache
+                        self.cache.insert(&next.history.path, next.clone());
 
                         Ok(next)
                     }
@@ -139,10 +215,19 @@ where
     }
 
     pub fn left(self) -> Result<Zipper<T>, ZipperErr> {
+        // this is where we want to go
+        let next_history = self.history.clone().step(Step::Left);
+        // check cache and return if possible
+        match self.cache.find(&next_history.path) {
+            _ => (),
+        }
+
+        // see if we can move
         match (
             self.index_in_parent,
             self.parent.as_ref().map(|p| p.node.children()),
         ) {
+            // we can
             (Some(index), Some(mut children)) if index > 0 => {
                 let left_index = index - 1;
                 match children.nth(left_index) {
@@ -152,7 +237,12 @@ where
                             parent: self.parent.clone(),
                             index_in_parent: Some(left_index),
                             history: self.history.step(Step::Left),
+                            cache: self.cache.clone(),
                         };
+
+                        // add to cache
+                        self.cache.insert(&next.history.path, next.clone());
+
                         Ok(next)
                     }
                     None => Err(ZipperErr::CannotGoLeft),

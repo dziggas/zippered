@@ -1,6 +1,6 @@
 use zippered::zipper::Zippable;
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 struct Usize(usize);
 
 impl Zippable for Usize {

@@ -144,3 +144,21 @@ fn down_left_fail() -> Result<(), ZipperErr> {
     assert!(result.is_err());
     Ok(())
 }
+
+#[test]
+fn down_down_up_up_down_down() -> Result<(), ZipperErr> {
+    let tree = Tree::Branch(vec![Tree::Branch(vec![Tree::Node(1)]), Tree::Node(2)]);
+
+    let result = tree
+        .zipper()
+        .down()?
+        .down()?
+        .up()?
+        .up()?
+        .down()?
+        .down()?
+        .node;
+
+    assert_eq!(result, Tree::Node(1));
+    Ok(())
+}
