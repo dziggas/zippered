@@ -132,6 +132,7 @@ where
         let next_history = self.history.clone().step(Step::Down);
         // check cache and return if possible
         match self.cache.find(&next_history.path) {
+            Some(cached) => return Ok(cached),
             _ => (),
         }
 
@@ -181,6 +182,7 @@ where
         let next_history = self.history.clone().step(Step::Right);
         // check cache and return if possible
         match self.cache.find(&next_history.path) {
+            Some(cached) => return Ok(cached),
             _ => (),
         }
 
@@ -219,6 +221,7 @@ where
         let next_history = self.history.clone().step(Step::Left);
         // check cache and return if possible
         match self.cache.find(&next_history.path) {
+            Some(cached) => return Ok(cached),
             _ => (),
         }
 
@@ -252,6 +255,24 @@ where
         }
     }
 
+    pub fn back(self) -> Result<Zipper<T>, ZipperErr> {
+        // this is where we want to go
+        let next_history = self.history.clone().step(Step::Back);
+
+        // check cache and return if possible
+        match self.cache.find(&next_history.path) {
+            Some(cached) => return Ok(cached),
+            _ => (),
+        }
+
+        // there is no traversal path, we are at the top, use parent if it exists
+        if next_history.path.len() == 0 && self.parent.is_some() {
+            return Ok((*self.parent.unwrap()).clone());
+        } else {
+            Err(ZipperErr::CannotGoBack)
+        }
+    }
+
     pub fn show(self) -> Self
     where
         Self: Debug,
@@ -267,4 +288,5 @@ pub enum ZipperErr {
     CannotGoLeft,
     CannotGoRight,
     CannotGoDown,
+    CannotGoBack,
 }

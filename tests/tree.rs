@@ -66,10 +66,30 @@ fn down_up() -> Result<(), ZipperErr> {
 }
 
 #[test]
+fn down_back() -> Result<(), ZipperErr> {
+    let tree = Tree::Branch(vec![Tree::Branch(vec![Tree::Node(1)]), Tree::Node(2)]);
+
+    let result = tree.zipper().down()?.back()?.node;
+
+    assert_eq!(result, tree);
+    Ok(())
+}
+
+#[test]
 fn down_down_up() -> Result<(), ZipperErr> {
     let tree = Tree::Branch(vec![Tree::Branch(vec![Tree::Node(1)]), Tree::Node(2)]);
 
     let result = tree.zipper().down()?.down()?.up()?.node;
+
+    assert_eq!(result, Tree::Branch(vec![Tree::Node(1)]));
+    Ok(())
+}
+
+#[test]
+fn down_down_back() -> Result<(), ZipperErr> {
+    let tree = Tree::Branch(vec![Tree::Branch(vec![Tree::Node(1)]), Tree::Node(2)]);
+
+    let result = tree.zipper().down()?.down()?.back()?.node;
 
     assert_eq!(result, Tree::Branch(vec![Tree::Node(1)]));
     Ok(())
@@ -126,10 +146,40 @@ fn down_right_left() -> Result<(), ZipperErr> {
 }
 
 #[test]
+fn down_right_back() -> Result<(), ZipperErr> {
+    let tree = Tree::Branch(vec![Tree::Branch(vec![Tree::Node(1)]), Tree::Node(2)]);
+
+    let result = tree.zipper().down()?.right()?.back()?.node;
+
+    assert_eq!(result, Tree::Branch(vec![Tree::Node(1)]));
+    Ok(())
+}
+
+#[test]
 fn left_fail() -> Result<(), ZipperErr> {
     let tree = Tree::Branch(vec![Tree::Branch(vec![Tree::Node(1)]), Tree::Node(2)]);
 
     let result = tree.zipper().left();
+
+    assert!(result.is_err());
+    Ok(())
+}
+
+#[test]
+fn up_fail() -> Result<(), ZipperErr> {
+    let tree = Tree::Branch(vec![Tree::Branch(vec![Tree::Node(1)]), Tree::Node(2)]);
+
+    let result = tree.zipper().up();
+
+    assert!(result.is_err());
+    Ok(())
+}
+
+#[test]
+fn back_fail() -> Result<(), ZipperErr> {
+    let tree = Tree::Branch(vec![Tree::Branch(vec![Tree::Node(1)]), Tree::Node(2)]);
+
+    let result = tree.zipper().back();
 
     assert!(result.is_err());
     Ok(())
