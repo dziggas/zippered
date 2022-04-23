@@ -1,3 +1,5 @@
+[![CI](https://github.com/dziggas/zippered/actions/workflows/rust.yml/badge.svg)](https://github.com/dziggas/zippered/actions/workflows/rust.yml)
+
 # zippered
 A simple, *read-only* implementation of [Huet's Zipper](https://www.st.cs.uni-saarland.de//edu/seminare/2005/advanced-fp/docs/huet-zipper.pdf)
 
