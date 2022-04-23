@@ -1,20 +1,69 @@
+//! The `Zippable` trait for creating a `Zipper` from a tree-like structure.
+//!
+//! Provides arbitrary navigation of tree-like types. Allows for moving Up, Down, Left, Right, and Back based on arbitrary criteria.
+//!
+//! Ideal for algorithms that explore trees or applications where a user makes runtime navigation choices, such as:
+//! - File and folder systems
+//! - Directed graph node similarity
+//!
+//! Basic usage:
+//!
+//! ```
+//! use zippered::zipper::{Step::*, *};
+//!
+//! #[derive(Clone)]
+//! enum Tree {
+//!     Node(usize),
+//!     Branch(Vec<Tree>),
+//! }
+//!
+//! impl Zippable for Tree {
+//!     fn children(&self) -> Box<dyn Iterator<Item = Self> + '_> {
+//!         match self {
+//!             Tree::Node(_) => Box::new(std::iter::empty()),
+//!             Tree::Branch(branch) => Box::new(branch.iter().cloned()),
+//!         }
+//!     }
+//! }
+//!
+//! # fn main() -> Result<(), ZipperErr> {
+//! # let tree = Tree::Branch(vec![Tree::Node(1), Tree::Node(2)]);
+//!
+//! // step around the tree
+//! let value = tree.zipper().down()?.right()?.node;
+//!
+//! // or...
+//! tree.zipper().travel(vec![Down, Right].into_iter());
+//!
+//! # Ok(())
+//! # }
+//! ```
+
+use im::Vector;
 use std::collections::HashMap;
 use std::rc::Rc;
 use std::{cell::RefCell, fmt::Debug};
 
-use im::Vector;
-
+/// A trait for describing how a type can be made capable of be producing a [Zipper].
+///
+/// Any type that can describe iterating its children via an [Iterator] can be made [Zippable].
 pub trait Zippable
 where
     Self: Clone,
 {
+    /// Returns the children of the value. An empty [Iterator] can be used to signal that a node
+    /// cannot or does not have children. See [std::iter::empty]
     fn children(&self) -> Box<dyn Iterator<Item = Self> + '_>;
 
+    /// Creates and returns a [Zipper] for this value
     fn zipper(&self) -> Zipper<Self> {
         Zipper::new(self.clone())
     }
 }
 
+/// A unit of movement in a direction that a [Zipper] uses to traverse a [Zippable] tree.
+///
+/// See [Zipper::travel]
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
 pub enum Step {
     Up,
@@ -26,8 +75,9 @@ pub enum Step {
 
 type Path = Vector<Step>;
 
+/// A record of the [Step]s taken by a [Zipper].
 #[derive(Debug, Clone)]
-pub struct History {
+struct History {
     path: Path,
     journey: Path,
 }
@@ -107,6 +157,12 @@ where
     }
 }
 
+/// A cursor over a tree structure of [Zippable]s. Can be moved up, down, left, and right through
+/// the tree and records traversal history as moves. A Zipper considers a tree's root to be at the top,
+/// getting wider at the bottom. As such, Zipper cannot move `up`, `left`, or `right` from its starting position, nor
+/// can it move `back` without moving elsewhere first.
+///
+/// Can [step](Zipper#method.step) or [travel](Zipper#method.travel) by processing [Step]s accordingly
 #[derive(Clone)]
 pub struct Zipper<T>
 where
@@ -133,6 +189,8 @@ where
         }
     }
 
+    /// Returns a new Zipper after moving down to this value's first child, or [ZipperErr.CannotMoveDown] if
+    /// no children can or do exist.
     pub fn down(self) -> Result<Zipper<T>, ZipperErr> {
         // this is where we want to go
         let next_history = self.history.clone().step(Step::Down);
@@ -173,6 +231,8 @@ where
         }
     }
 
+    /// Returns a new Zipper after moving up to this value's parent, or [ZipperErr.CannotMoveUp] if
+    /// already at the root / top of the tree.
     pub fn up(self) -> Result<Zipper<T>, ZipperErr> {
         match self.parent {
             Some(ref parent) => Ok(Zipper {
@@ -186,6 +246,8 @@ where
         }
     }
 
+    /// Returns a new Zipper after moving right to this value's next sibling, or [ZipperErr.CannotMoveRight] if
+    /// no right sibling exists.
     pub fn right(self) -> Result<Zipper<T>, ZipperErr> {
         // this is where we want to go
         let next_history = self.history.clone().step(Step::Right);
@@ -228,6 +290,8 @@ where
         }
     }
 
+    /// Returns a new Zipper after moving left to this value's previous sibling, or [ZipperErr.CannotMoveLeft] if
+    /// no left sibling exists.
     pub fn left(self) -> Result<Zipper<T>, ZipperErr> {
         // this is where we want to go
         let next_history = self.history.clone().step(Step::Left);
@@ -272,6 +336,8 @@ where
         }
     }
 
+    /// Returns a new Zipper after moving to the step prior the current value, or [ZipperErr.CannotMoveBack] if
+    /// there have not yet been any [Step]s taken.
     pub fn back(self) -> Result<Zipper<T>, ZipperErr> {
         // this is where we want to go
         let next_history = self.history.clone().step(Step::Back);
@@ -296,6 +362,8 @@ where
         }
     }
 
+    /// Return a new Zipper after taking a [Step] in the specified direction, or the relevant [ZipperErr] if
+    /// no step can be taken.
     pub fn step(self, step: &Step) -> Result<Zipper<T>, ZipperErr> {
         match step {
             Step::Up => self.up(),
@@ -306,6 +374,8 @@ where
         }
     }
 
+    /// Return a new Zipper after taking the specified sequence of [Step]s, or the relevant [ZipperErr] if
+    /// any step cannot be taken.
     pub fn travel(self, path: impl Iterator<Item = Step>) -> Result<Zipper<T>, ZipperErr> {
         let mut zipper = self;
 
@@ -316,23 +386,29 @@ where
         Ok(zipper)
     }
 
+    /// The the most direct sequence of [Step]s taken to reach the [Zipper]'s current position.
     pub fn path(&self) -> impl Iterator<Item = Step> + '_ {
         self.history.path.iter().cloned()
     }
 
+    /// The the exact sequence of [Step]s taken to reach the [Zipper]'s current position.
+    ///
+    /// This differs from [path](#method.path) in that it includes backtracking steps
     pub fn journey(&self) -> impl Iterator<Item = Step> + '_ {
         self.history.journey.iter().cloned()
     }
 
+    /// Prints the current state of the [Zipper] via dbg
     pub fn show(self) -> Self
     where
         Self: Debug,
     {
-        println!("{:#?}", &self);
+        dbg!("{:#?}", &self);
         self
     }
 }
 
+/// Represents a [Zipper]'s inability to move in a given direction.
 #[derive(Debug, Clone, Copy)]
 pub enum ZipperErr {
     CannotGoUp,

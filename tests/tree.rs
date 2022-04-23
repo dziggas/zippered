@@ -1,5 +1,4 @@
-use zippered::zipper::{Step, Zippable, ZipperErr};
-use Step::*;
+use zippered::zipper::{Step::*, *};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Tree {
