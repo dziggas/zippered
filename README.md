@@ -1,7 +1,7 @@
 [![CI](https://github.com/dziggas/zippered/actions/workflows/rust.yml/badge.svg)](https://github.com/dziggas/zippered/actions/workflows/rust.yml)
 
 # zippered
-A simple, *read-only* implementation of [Huet's Zipper](https://www.st.cs.uni-saarland.de//edu/seminare/2005/advanced-fp/docs/huet-zipper.pdf)
+A simple, *read-only* implementation of [Huet's Zipper](https://www.st.cs.uni-saarland.de//edu/seminare/2005/advanced-fp/docs/huet-zipper.pdf) in Rust
 
 [Zippers](https://en.wikipedia.org/wiki/Zipper_(data_structure)) allow for arbitrary navigation of a tree's nodes and branches. 
 
