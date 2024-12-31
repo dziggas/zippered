@@ -18,11 +18,10 @@ impl<'g> ZippableGraph<'g> {
 }
 
 impl<'g> Zippable for ZippableGraph<'g> {
-    fn children(&self) -> Box<dyn Iterator<Item = Self> + '_> {
+    fn children(&self) -> impl Iterator<Item = Self> + '_ {
         Box::new(
             self.graph
                 .neighbors_directed(self.node_idx, Outgoing)
-                .into_iter()
                 .map(|node| ZippableGraph::new(self.graph, node))
                 // should not be necessary to do this normally, but neighbors are iterated in reverse-add order
                 // in petgraph, so we collect and reverse again here to make the tests easier to follow
@@ -39,7 +38,7 @@ fn down() -> Result<(), ZipperErr> {
     let root = graph.add_node(0);
     let one = graph.add_node(1);
     let two = graph.add_node(2);
-    graph.extend_with_edges(&[(root, one), (root, two)]);
+    graph.extend_with_edges([(root, one), (root, two)]);
 
     let zippable = ZippableGraph::new(&graph, root);
 
@@ -56,7 +55,7 @@ fn down_down() -> Result<(), ZipperErr> {
     let parent = graph.add_node(42);
     let one = graph.add_node(1);
     let two = graph.add_node(2);
-    graph.extend_with_edges(&[(root, parent), (parent, one), (parent, two)]);
+    graph.extend_with_edges([(root, parent), (parent, one), (parent, two)]);
 
     let zippable = ZippableGraph::new(&graph, root);
 
@@ -86,7 +85,7 @@ fn down_up() -> Result<(), ZipperErr> {
     let parent = graph.add_node(42);
     let one = graph.add_node(1);
     let two = graph.add_node(2);
-    graph.extend_with_edges(&[(root, parent), (parent, one), (parent, two)]);
+    graph.extend_with_edges([(root, parent), (parent, one), (parent, two)]);
 
     let zippable = ZippableGraph::new(&graph, root);
 
@@ -103,7 +102,7 @@ fn down_down_up() -> Result<(), ZipperErr> {
     let parent = graph.add_node(42);
     let one = graph.add_node(1);
     let two = graph.add_node(2);
-    graph.extend_with_edges(&[(root, parent), (parent, one), (parent, two)]);
+    graph.extend_with_edges([(root, parent), (parent, one), (parent, two)]);
 
     let zippable = ZippableGraph::new(&graph, root);
 
@@ -120,7 +119,7 @@ fn down_down_up_up() -> Result<(), ZipperErr> {
     let parent = graph.add_node(42);
     let one = graph.add_node(1);
     let two = graph.add_node(2);
-    graph.extend_with_edges(&[(root, parent), (parent, one), (parent, two)]);
+    graph.extend_with_edges([(root, parent), (parent, one), (parent, two)]);
 
     let zippable = ZippableGraph::new(&graph, root);
 
@@ -136,7 +135,7 @@ fn down_right() -> Result<(), ZipperErr> {
     let root = graph.add_node(0);
     let one = graph.add_node(1);
     let two = graph.add_node(2);
-    graph.extend_with_edges(&[(root, one), (root, two)]);
+    graph.extend_with_edges([(root, one), (root, two)]);
 
     let zippable = ZippableGraph::new(&graph, root);
 
@@ -152,7 +151,7 @@ fn down_right_up() -> Result<(), ZipperErr> {
     let root = graph.add_node(0);
     let one = graph.add_node(1);
     let two = graph.add_node(2);
-    graph.extend_with_edges(&[(root, one), (root, two)]);
+    graph.extend_with_edges([(root, one), (root, two)]);
 
     let zippable = ZippableGraph::new(&graph, root);
 
@@ -167,7 +166,7 @@ fn down_right_fail() -> Result<(), ZipperErr> {
     let mut graph = Graph::<usize, usize, petgraph::Directed>::new();
     let root = graph.add_node(0);
     let one = graph.add_node(1);
-    graph.extend_with_edges(&[(root, one)]);
+    graph.extend_with_edges([(root, one)]);
 
     let zippable = ZippableGraph::new(&graph, root);
 
@@ -183,7 +182,7 @@ fn down_right_left() -> Result<(), ZipperErr> {
     let root = graph.add_node(0);
     let one = graph.add_node(1);
     let two = graph.add_node(2);
-    graph.extend_with_edges(&[(root, one), (root, two)]);
+    graph.extend_with_edges([(root, one), (root, two)]);
 
     let zippable = ZippableGraph::new(&graph, root);
 
@@ -199,7 +198,7 @@ fn left_fail() -> Result<(), ZipperErr> {
     let root = graph.add_node(0);
     let one = graph.add_node(1);
     let two = graph.add_node(2);
-    graph.extend_with_edges(&[(root, one), (root, two)]);
+    graph.extend_with_edges([(root, one), (root, two)]);
 
     let zippable = ZippableGraph::new(&graph, root);
 
@@ -214,7 +213,7 @@ fn down_left_fail() -> Result<(), ZipperErr> {
     let mut graph = Graph::<usize, usize, petgraph::Directed>::new();
     let root = graph.add_node(0);
     let one = graph.add_node(1);
-    graph.extend_with_edges(&[(root, one)]);
+    graph.extend_with_edges([(root, one)]);
 
     let zippable = ZippableGraph::new(&graph, root);
 

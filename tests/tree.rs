@@ -7,6 +7,7 @@ enum Tree {
 }
 
 impl Zippable for Tree {
+    #[allow(refining_impl_trait)]
     fn children(&self) -> Box<dyn Iterator<Item = Self> + '_> {
         match self {
             Tree::Node(_) => Box::new(std::iter::empty()),

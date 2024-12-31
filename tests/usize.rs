@@ -4,7 +4,7 @@ use zippered::zipper::Zippable;
 struct Usize(usize);
 
 impl Zippable for Usize {
-    fn children(&self) -> Box<dyn Iterator<Item = Self> + '_> {
+    fn children(&self) -> impl Iterator<Item = Self> + '_ {
         Box::new(std::iter::empty())
     }
 }

@@ -53,7 +53,8 @@ where
 {
     /// Returns the children of the value. An empty [Iterator] can be used to signal that a node
     /// cannot or does not have children. See [std::iter::empty]
-    fn children(&self) -> Box<dyn Iterator<Item = Self> + '_>;
+    // fn children(&self) -> Box<dyn Iterator<Item = Self> + '_>;
+    fn children(&self) -> impl Iterator<Item = Self> + '_;
 
     /// Creates and returns a [Zipper] for this value
     fn zipper(&self) -> Zipper<Self> {
@@ -195,12 +196,9 @@ where
         // this is where we want to go
         let next_history = self.history.clone().step(Step::Down);
         // check cache and return if possible
-        match self.cache.find(&next_history.path) {
-            Some(mut cached) => {
-                cached.history = next_history;
-                return Ok(cached);
-            }
-            _ => (),
+        if let Some(mut cached) = self.cache.find(&next_history.path) {
+            cached.history = next_history;
+            return Ok(cached);
         }
 
         // see if we can move
@@ -252,12 +250,9 @@ where
         // this is where we want to go
         let next_history = self.history.clone().step(Step::Right);
         // check cache and return if possible
-        match self.cache.find(&next_history.path) {
-            Some(mut cached) => {
-                cached.history = next_history;
-                return Ok(cached);
-            }
-            _ => (),
+        if let Some(mut cached) = self.cache.find(&next_history.path) {
+            cached.history = next_history;
+            return Ok(cached);
         }
 
         // see if we can move
@@ -296,12 +291,9 @@ where
         // this is where we want to go
         let next_history = self.history.clone().step(Step::Left);
         // check cache and return if possible
-        match self.cache.find(&next_history.path) {
-            Some(mut cached) => {
-                cached.history = next_history;
-                return Ok(cached);
-            }
-            _ => (),
+        if let Some(mut cached) = self.cache.find(&next_history.path) {
+            cached.history = next_history;
+            return Ok(cached);
         }
 
         dbg!("We should really never be here if caching is working.");
@@ -343,12 +335,9 @@ where
         let next_history = self.history.clone().step(Step::Back);
 
         // check cache and return if possible
-        match self.cache.find(&next_history.path) {
-            Some(mut cached) => {
-                cached.history = next_history;
-                return Ok(cached);
-            }
-            _ => (),
+        if let Some(mut cached) = self.cache.find(&next_history.path) {
+            cached.history = next_history;
+            return Ok(cached);
         }
 
         // there is no traversal path, we are at the top, use parent if it exists
